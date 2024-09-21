@@ -1,6 +1,7 @@
 package com.alexeiddg.backend.decryption.service;
 
 import com.alexeiddg.backend.encryption.service.*;
+import com.alexeiddg.backend.encryption.util.CipherTextGenerator;
 import com.alexeiddg.backend.keygen.model.KeyMatrix;
 import com.alexeiddg.backend.util.StringToBitstream;
 import com.alexeiddg.backend.util.HashService;
@@ -15,7 +16,7 @@ import static com.alexeiddg.backend.encryption.service.SBoxService.generateInver
 import static com.alexeiddg.backend.encryption.service.SBoxService.generateSBox;
 
 @Service
-public class ecryptionService {
+public class DecryptionService {
 
     @Autowired
     private SBoxService sBoxService;
@@ -36,36 +37,36 @@ public class ecryptionService {
     @Autowired
     private CipherTextGenerator cipherTextGenerator;
 
-    // Main decryption method
     public String decrypt(String clientKey, String ciphertext) throws Exception {
 
-        // FIXME: Matrices Now match
-        byte[] decodedCiphertext = Base64.getDecoder().decode(ciphertext);
+        byte[] decodedCiphertext = Base64.getUrlDecoder().decode(ciphertext);
         byte[][][] cipherMatrixChunks = StringToBitstream.byteArrayToMatrixChunks(decodedCiphertext);
 
-        // FIXME: decode the key
         byte[] byteArray = hexToByteArray(clientKey);
         KeyMatrix decodedKey = KeyMatrix.rebuildMatrix(byteArray);
         byte[] original_keyBytes = decodedKey.flattenMatrix();
 
         int rounds = extractFirstByteAsNumber(decodedKey);
 
-        KeyMatrix finalHashedKey = decodedKey;
-        for (int i = 0; i < rounds; i++) {
-            finalHashedKey = hashService.applySha256ToMatrix(finalHashedKey);
+        KeyMatrix[] keySequence = new KeyMatrix[rounds + 1];
+        keySequence[0] = decodedKey;
+        for (int i = 1; i <= rounds; i++) {
+            keySequence[i] = hashService.applySha256ToMatrix(keySequence[i - 1]);
         }
-        StringToBitstream.printMatrix(finalHashedKey.matrix());
+
+        KeyMatrix finalHashedKey = keySequence[rounds];
 
         cipherMatrixChunks = cbcService.reverseCBC(cipherMatrixChunks, finalHashedKey);
 
-        for (int i = 0; i < rounds; i++) {
+        for (int i = rounds - 1; i >= 0; i--) {
+            KeyMatrix currentKey = keySequence[i];
+
             for (int j = 0; j < cipherMatrixChunks.length; j++) {
-                cipherMatrixChunks[j] = transposeService.reverseTransposeMatrix(cipherMatrixChunks[j], decodedKey);
-                cipherMatrixChunks[j] = transformService.performBitShift(cipherMatrixChunks[j], decodedKey, false);
+                cipherMatrixChunks[j] = transposeService.reverseTransposeMatrix(cipherMatrixChunks[j], currentKey);
+                cipherMatrixChunks[j] = transformService.performBitShift(cipherMatrixChunks[j], currentKey, false);
             }
 
-            cipherMatrixChunks = xorService.xorBitstream(cipherMatrixChunks, decodedKey);
-            decodedKey = hashService.applySha256ToMatrix(decodedKey);
+            cipherMatrixChunks = xorService.xorBitstream(cipherMatrixChunks, currentKey);
         }
 
         byte[] sBox = generateSBox(original_keyBytes);
@@ -75,7 +76,6 @@ public class ecryptionService {
         byte[] plainBytes = StringToBitstream.matrixChunksToByteArray(cipherMatrixChunks);
         return new String(plainBytes, StandardCharsets.UTF_8);
     }
-
 
     private byte[] hexToByteArray(String hex) {
         int len = hex.length();

@@ -13,7 +13,7 @@ public class KeyEmbeddingService {
     public KeyMatrix embedKey(KeyMatrix entropyKey) {
         byte[][] matrix = entropyKey.matrix();
 
-        int randomInt = random.nextInt(16) + 1;
+        int randomInt = random.nextInt(24) + 1;
         byte randomByte = (byte) randomInt;
         matrix[0][0] = randomByte;
 

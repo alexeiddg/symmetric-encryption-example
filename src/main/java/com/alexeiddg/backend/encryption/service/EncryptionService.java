@@ -1,20 +1,27 @@
 package com.alexeiddg.backend.encryption.service;
 
+import com.alexeiddg.backend.encryption.util.CipherTextGenerator;
+import com.alexeiddg.backend.util.StringToBitstream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.alexeiddg.backend.encryption.model.EncryptionResponse;
-import com.alexeiddg.backend.util.StringToBitstream;
+import com.alexeiddg.backend.util.HashService;
 import com.alexeiddg.backend.keygen.model.KeyMatrix;
 import com.alexeiddg.backend.keygen.service.KeyGenService;
 
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+
 
 @Service
 public class EncryptionService {
 
     @Autowired
     private KeyGenService keyGenService;
+
+    @Autowired
+    private SBoxService sBoxService;
 
     @Autowired
     private XORService xorService;
@@ -26,42 +33,49 @@ public class EncryptionService {
     private TransposeService transposeService;
 
     @Autowired
+    private CBCService cbcService;
+
+    @Autowired
     private CipherTextGenerator cipherTextGenerator;
 
+    @Autowired
+    private HashService hashService;
 
     private KeyMatrix getEncryptionKey() {
         return keyGenService.generateKey();
     }
 
     public EncryptionResponse encrypt(String text) throws NoSuchAlgorithmException {
+
         KeyMatrix encryptionKey = getEncryptionKey();
 
-        // Extract the first byte from the matrix and use it as number
         assert encryptionKey != null;
         byte[][] keyMatrix = encryptionKey.matrix();
         byte firstByte = keyMatrix[0][0];
         int firstByteAsNumber = Byte.toUnsignedInt(firstByte);
-        // TODO: delete this line
-        System.out.println("First byte as number: " + firstByteAsNumber);
+        String clientKey = encryptionKey.flattenToHex();
 
-        // Encode the text to bitstream
-        String bitstream = StringToBitstream.stringToBitstream(text);
-        byte[][][] xorResult = StringToBitstream.bitstreamToMatrixChunks(bitstream);
+        byte[] textBytes = text.getBytes(StandardCharsets.UTF_8);
+        byte[][][] xorResult = StringToBitstream.generateMatrixPadding(textBytes);
 
-        // TODO: return the intermediate steps
-        // Perform XOR, Bit Shift, and Transpose
+        byte[] keyBytes = encryptionKey.flattenMatrix();
+        byte[] sBox = SBoxService.generateSBox(keyBytes);
+        xorResult = sBoxService.applySBoxSubstitution(xorResult, sBox);
+
         for (int i = 0; i < firstByteAsNumber; i++) {
-            xorResult = xorService.xorBitstream(xorResult, encryptionKey, i);
+            xorResult = xorService.xorBitstream(xorResult, encryptionKey);
 
-            // TODO: dynamic key based on rounds
             for (int j = 0; j < xorResult.length; j++) {
                 xorResult[j] = transformService.performBitShift(xorResult[j], encryptionKey, true);
                 xorResult[j] = transposeService.transposeMatrix(xorResult[j], encryptionKey);
             }
+
+            encryptionKey = hashService.applySha256ToMatrix(encryptionKey);
         }
 
-        String clientKey = encryptionKey.flattenToHex();
-        String ciphertText = cipherTextGenerator.returnCipherText(xorResult);
-        return new EncryptionResponse(ciphertText, clientKey, firstByteAsNumber);
+        xorResult = cbcService.applyCBC(xorResult, encryptionKey);
+        String cipherText = cipherTextGenerator.returnCipherText(xorResult);
+
+        return new EncryptionResponse(cipherText, clientKey, firstByteAsNumber);
     }
 }

@@ -1,4 +1,4 @@
-package com.alexeiddg.backend.encryption.service;
+package com.alexeiddg.backend.encryption.util;
 
 import org.springframework.stereotype.Service;
 

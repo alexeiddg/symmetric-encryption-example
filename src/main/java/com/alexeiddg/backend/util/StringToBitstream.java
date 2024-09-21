@@ -2,105 +2,86 @@ package com.alexeiddg.backend.util;
 
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
-
-// TODO: Code revision
+import java.io.ByteArrayOutputStream;
+import java.util.Arrays;
 
 @Service
 public class StringToBitstream {
 
-    public static String stringToBitstream(String text) {
-        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
-        StringBuilder bitstream = new StringBuilder();
-        for (byte b : bytes) {
-            StringBuilder binary = new StringBuilder(Integer.toBinaryString(Byte.toUnsignedInt(b)));
-            while (binary.length() < 8) {
-                binary.insert(0, "0");
+    // Apply ISO/IEC 7816-4 padding
+    public static byte[][][] generateMatrixPadding(byte[] byteArray) {
+        int chunkSize = 16;
+        int paddingLength = chunkSize - (byteArray.length % chunkSize);
+        int totalLength = byteArray.length + paddingLength;
+        byte[] paddedByteArray = Arrays.copyOf(byteArray, totalLength);
+
+        paddedByteArray[byteArray.length] = (byte) 0x80;
+
+        int totalChunks = totalLength / chunkSize;
+        byte[][][] matrixChunks = new byte[totalChunks][4][4];
+
+        for (int i = 0; i < totalChunks; i++) {
+            int start = i * chunkSize;
+            byte[] chunk = Arrays.copyOfRange(paddedByteArray, start, start + chunkSize);
+
+            byte[][] matrix = new byte[4][4];
+            for (int j = 0; j < chunkSize; j++) {
+                matrix[j / 4][j % 4] = chunk[j];
             }
-            bitstream.append(binary);
+
+            matrixChunks[i] = matrix;
         }
-        return bitstream.toString();
+
+        return matrixChunks;
     }
 
-    public static String bitstreamToString(String bitstream) {
-        int length = bitstream.length();
-        byte[] bytes = new byte[length / 8];
-        for (int i = 0; i < length; i += 8) {
-            String byteString = bitstream.substring(i, i + 8);
-            bytes[i / 8] = (byte) Integer.parseInt(byteString, 2);
-        }
-        return new String(bytes, StandardCharsets.UTF_8);
-    }
+    public static byte[][][] byteArrayToMatrixChunks(byte[] byteArray) {
+        int chunkSize = 16;
+        int totalLength = byteArray.length;
+        int totalChunks = (int) Math.ceil((double) totalLength / chunkSize);
+        byte[][][] matrixChunks = new byte[totalChunks][4][4];
 
-    public static byte[][] bitstreamToMatrix(String bitstream) {
-        if (bitstream.length() < 128) {
-            StringBuilder paddedBitstream = new StringBuilder(bitstream);
-            while (paddedBitstream.length() < 128) {
-                paddedBitstream.append("0");
+        for (int i = 0; i < totalChunks; i++) {
+            int start = i * chunkSize;
+            int end = Math.min(start + chunkSize, totalLength);
+            byte[] chunk = Arrays.copyOfRange(byteArray, start, end);
+
+            byte[][] matrix = new byte[4][4];
+            for (int j = 0; j < chunk.length; j++) {
+                matrix[j / 4][j % 4] = chunk[j];
             }
-            bitstream = paddedBitstream.toString();
-        } else if (bitstream.length() > 128) {
-            bitstream = bitstream.substring(0, 128);
-        }
 
-        byte[][] matrix = new byte[4][4];
-        for (int i = 0; i < 16; i++) {
-            String byteString = bitstream.substring(i * 8, (i + 1) * 8);
-            byte value = (byte) Integer.parseInt(byteString, 2);
-            matrix[i / 4][i % 4] = value;
-        }
-
-        return matrix;
-    }
-
-    public static byte[][][] bitstreamToMatrixChunks(String bitstream) {
-        int chunkCount = (bitstream.length() + 127) / 128; // Calculate the number of 128-bit chunks
-        byte[][][] chunks = new byte[chunkCount][4][4];
-
-        for (int chunk = 0; chunk < chunkCount; chunk++) {
-            String chunkBitstream = bitstream.substring(chunk * 128, Math.min((chunk + 1) * 128, bitstream.length()));
-
-            for (int i = 0; i < chunkBitstream.length() / 8; i++) {
-                String byteString = chunkBitstream.substring(i * 8, (i + 1) * 8);
-                byte value = (byte) Integer.parseInt(byteString, 2);
-                chunks[chunk][i / 4][i % 4] = value;
+            for (int j = chunk.length; j < chunkSize; j++) {
+                matrix[j / 4][j % 4] = 0;
             }
+
+            matrixChunks[i] = matrix;
         }
-        return chunks;
+
+        return matrixChunks;
     }
 
-    public static String matrixChunksToBitstream(byte[][][] chunks) {
-        StringBuilder bitstream = new StringBuilder();
-        for (byte[][] matrix : chunks) {
+    public static byte[] matrixChunksToByteArray(byte[][][] matrixChunks) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        for (byte[][] matrix : matrixChunks) {
             for (byte[] row : matrix) {
-                for (byte b : row) {
-                    String binary = String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(b))).replace(' ', '0');
-                    bitstream.append(binary);
-                }
+                outputStream.write(row, 0, row.length);
             }
         }
-        return bitstream.toString();
-    }
 
-    public static String matrixToBitstream(byte[][] matrix) {
-        StringBuilder bitstream = new StringBuilder();
-        for (byte[] row : matrix) {
-            for (byte b : row) {
-                String binary = String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(b))).replace(' ', '0');
-                bitstream.append(binary);
-            }
+        byte[] fullByteArray = outputStream.toByteArray();
+
+        // Remove ISO/IEC 7816-4 padding
+        int i = fullByteArray.length - 1;
+        while (i >= 0 && fullByteArray[i] == 0x00) {
+            i--;
         }
-        return bitstream.toString();
-    }
-
-
-
-    public static void printMatrix(byte[][] matrix) {
-        for (byte[] row : matrix) {
-            for (byte element : row) {
-                System.out.printf("%02x ", element);
-            }
-            System.out.println();
+        if (i >= 0 && fullByteArray[i] == (byte) 0x80) {
+            return Arrays.copyOfRange(fullByteArray, 0, i);
+        } else {
+            throw new IllegalArgumentException("Invalid padding");
         }
     }
+
 }
