@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE instance-profile
+        SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
+
+<instance-profile id="hi"
+                 name="Writerside"
+                 start-page="starter.md">
+
+    <toc-element topic="starter.md"/>
+    <toc-element topic="Decryption-Workflow.md"/>
+    <toc-element topic="Encryption-Workflow.md">
+        <toc-element topic="Util-CipherTextGenerator.md"/>
+        <toc-element topic="FInal-Round-Cipher-Block-Chaining.md"/>
+        <toc-element topic="Diffusion-TransposeService.md"/>
+        <toc-element topic="Diffusion-TransformService.md"/>
+        <toc-element topic="Confusion-XORService.md"/>
+        <toc-element topic="SBoxService.md"/>
+    </toc-element>
+    <toc-element topic="Kegen.md">
+        <toc-element topic="KeyGenService.md"/>
+        <toc-element topic="KeyEmbeddingService.md"/>
+        <toc-element topic="KeyMatrix-Model.md"/>
+    </toc-element>
+    <toc-element topic="Util.md">
+        <toc-element topic="StringToBitstream.md"/>
+        <toc-element topic="EntropyHandler.md"/>
+        <toc-element topic="HashService.md"/>
+    </toc-element>
+</instance-profile>
