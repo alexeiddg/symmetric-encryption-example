@@ -10,7 +10,7 @@ permissions:
   pages: write
 
 env:
-  INSTANCE: 'hi'
+  INSTANCE: 'MyModule/MyProduct'
   ARTIFACT: 'webHelpHI2-all.zip'
   DOCKER_VERSION: '242.21870'
 
