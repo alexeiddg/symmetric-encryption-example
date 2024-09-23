@@ -3,10 +3,7 @@ package com.alexeiddg.backend.encryption.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.alexeiddg.backend.encryption.service.EncryptionService;
 import com.alexeiddg.backend.encryption.model.EncryptionResponse;
@@ -15,6 +12,7 @@ import com.alexeiddg.backend.encryption.model.EncryptionRequest;
 import java.security.NoSuchAlgorithmException;
 
 @RestController
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/api")
 public class EncryptionController {
 

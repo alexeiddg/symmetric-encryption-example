@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import com.alexeiddg.backend.decryption.service.DecryptionService;
 
 @RestController
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/api")
 public class DecryptionController {
 
